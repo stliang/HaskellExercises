@@ -1,0 +1,27 @@
+name: acme-emr
+ghc-options: -Wall -Wincomplete-uni-patterns
+
+dependencies:
+  - base
+  - bytestring
+  - cassava
+  - safe
+  - string-conv
+  - text
+  - vector
+
+executables:
+  mapper:
+    source-dirs: mapper
+    main: Main.hs
+    dependencies:
+      - acme-emr
+
+  reducer:
+    source-dirs: reducer
+    main: Main.hs
+    dependencies:
+      - acme-emr
+
+library:
+  source-dirs: src
