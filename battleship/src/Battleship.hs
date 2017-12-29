@@ -19,6 +19,7 @@ data Cell
   = Unchecked -- Position not been attacked before
   | Hit -- A ship occupying the position, subsequent attacks signal Taken
   | Miss -- No ship occupies the position, subsequent attacks signal Taken
+  deriving (Eq, Show)
 
 -- Tracking grid: your target scene
 type TrackingGrid = Matrix Cell
@@ -35,7 +36,7 @@ data ShipType
   | Cruiser
   | Submarine
   | Destroyer
-  deriving (Eq, Show)
+  deriving (Enum, Eq, Show)
 
 type ShipeWidth = Int
 
@@ -126,66 +127,45 @@ neighbourCells = foldr (\x acc -> lr x ++ tb x ++ acc) []
     tb (i, j) = [(i + 1, j), (i - 1, j)]
 
 -- Check if the proposed site is already occupied
-isOccupied :: [Coordinate] -> PrimaryGrid -> Bool
-isOccupied coords grid = all (\(i, j) -> not $ getElem i j grid) proposed
+isNotOccupied :: [Coordinate] -> PrimaryGrid -> Bool
+isNotOccupied coords grid = all (\(i, j) -> not $ getElem i j grid) proposed
   where
     proposed = filter (`inBound` grid) $ nub $ neighbourCells coords ++ coords
 
 -- Update primary grid with ship placement
 updatePrimaryGrid :: [Coordinate] -> PrimaryGrid -> PrimaryGrid
--- updatePrimaryGrid [] grid = grid
--- updatePrimaryGrid (x:xs) grid = updatePrimaryGrid xs (setElem True x grid)
---updatePrimaryGrid xs grid = foldl (flip (setElem True)) grid xs
 updatePrimaryGrid xs grid = foldr (setElem True) grid xs
 
 -- Update existing ship on primary grid
-updateExistingShip :: ShipType -> [ShipType] -> [ShipType]
-updateExistingShip ship ships =
-  case elem ship ships of
-    True -> ships
-    _ -> ship : ships
+updateMyShipRegistery :: ShipType -> [ShipType] -> [ShipType]
+updateMyShipRegistery ship ships =
+  if ship `elem` ships
+    then ships
+    else ship : ships
 
 -- Place a new type of ship onto primary grid only if space avaliable
 placeShip :: Coordinate -> Direction -> ShipType -> Scene -> Scene
 placeShip coord dir ship scene =
-  case invalidPlacement of
-    True -> scene
-    False ->
-      Scene
-        (updatePrimaryGrid proposedShip $ myPrimaryGrid scene)
-        (updateExistingShip ship $ myShips scene)
+  if invalidPlacement
+    then scene
+    else Scene
+           (updatePrimaryGrid proposedShip $ myPrimaryGrid scene)
+           (updateMyShipRegistery ship $ myShips scene)
   where
     proposedShip = shipCoordinate coord dir ship
     grid = myPrimaryGrid scene
-    isAlreadyPlaced = elem ship (myShips scene)
+    isAlreadyPlaced = ship `elem` myShips scene
     isNotInBound = not $ all (`inBound` grid) proposedShip
-    isNotAvaliable = isOccupied proposedShip grid
+    isNotAvaliable = not $ isNotOccupied proposedShip grid
     invalidPlacement = isAlreadyPlaced || isNotInBound || isNotAvaliable -- should short circuit
 
--- Test data:
-carrier = Carrier
+emptyPrimaryGrid :: Int -> Int -> PrimaryGrid
+emptyPrimaryGrid r c = matrix r c $ \(i, j) -> False
 
-battelship = Battleship
+blankTrackingGrid :: Int -> Int -> TrackingGrid
+blankTrackingGrid r c = matrix r c $ \(i, j) -> Unchecked
 
-cruiser = Cruiser
-
-submarine = Submarine
-
-destroyer = Destroyer
-
-testTargetingGrid = (matrix 10 10 $ \(i, j) -> Unchecked) :: TrackingGrid
-
-testPrimaryGrid = (matrix 10 10 $ \(i, j) -> False) :: PrimaryGrid
-
-grid1 = setElem True (3, 3) testPrimaryGrid
-
-grid2 = setElem True (3, 4) grid1
-
-grid3 = setElem True (3, 5) grid2
-
-scene = Scene testPrimaryGrid [carrier, cruiser]
-
-scene' = placeShip (1, 1) TailLeft destroyer scene
-
---placeShip :: Coordinate -> Direction -> ShipType -> Scene -> Scene
-scene'' = placeShip (6, 7) TailUp cruiser scene'
+showGrid
+  :: Show a
+  => Matrix a -> IO ()
+showGrid m = putStrLn $ prettyMatrix m

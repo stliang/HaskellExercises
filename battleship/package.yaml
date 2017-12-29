@@ -21,9 +21,13 @@ description:         Please see the README on Github at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- matrix
 
 library:
   source-dirs: src
+  exposed-modules:
+  - Battleship
+  - Lib
 
 executables:
   battleship-exe:
@@ -35,7 +39,6 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - battleship
-    - matrix
 
 tests:
   battleship-test:
@@ -47,3 +50,5 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - battleship
+    - hspec
+    - QuickCheck
