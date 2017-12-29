@@ -95,13 +95,13 @@ shipCoordinate (i, j) dir ship =
     TailLeft -> goLR negate sl
     TailRight -> goLR id sl
   where
-    sl = (shipLength $ dim ship) - 1 -- Minus one because counting down from shipLength
+    sl = shipLength (dim ship) - 1 -- Minus one because counting down from shipLength
     goUD :: (Int -> Int) -> Int -> [Coordinate]
-    goUD _ 0 = (i, j) : []
-    goUD f x = (i + (f x), j) : goUD f (x - 1)
+    goUD _ 0 = [(i, j)]
+    goUD f x = (i + f x, j) : goUD f (x - 1)
     goLR :: (Int -> Int) -> Int -> [Coordinate]
-    goLR _ 0 = (i, j) : []
-    goLR f x = (i, (j + (f x))) : goLR f (x - 1)
+    goLR _ 0 = [(i, j)]
+    goLR f x = (i, j + f x) : goLR f (x - 1)
 
 -- Check if a Coordinate is within the bound of a given grid
 inBound :: Coordinate -> PrimaryGrid -> Bool
@@ -120,30 +120,45 @@ allShipPositions grid = [(i, j) | i <- [1 .. r], j <- [1 .. c], getElem i j grid
 
 -- Get the surrounding cells of a given list of coordinates
 neighbourCells :: [Coordinate] -> [Coordinate]
-neighbourCells coords = go coords []
+neighbourCells = foldr (\x acc -> lr x ++ tb x ++ acc) []
   where
     lr (i, j) = [(i, j - 1), (i, j + 1)]
     tb (i, j) = [(i + 1, j), (i - 1, j)]
-    go [] acc = acc
-    go (x:xs) acc = go xs ((lr x) ++ (tb x) ++ acc)
 
 -- Check if the proposed site is already occupied
 isOccupied :: [Coordinate] -> PrimaryGrid -> Bool
 isOccupied coords grid = all (\(i, j) -> not $ getElem i j grid) proposed
   where
-    proposed = filter (flip inBound $ grid) $ nub $ neighbourCells coords ++ coords
+    proposed = filter (`inBound` grid) $ nub $ neighbourCells coords ++ coords
+
+-- Update primary grid with ship placement
+updatePrimaryGrid :: [Coordinate] -> PrimaryGrid -> PrimaryGrid
+-- updatePrimaryGrid [] grid = grid
+-- updatePrimaryGrid (x:xs) grid = updatePrimaryGrid xs (setElem True x grid)
+--updatePrimaryGrid xs grid = foldl (flip (setElem True)) grid xs
+updatePrimaryGrid xs grid = foldr (setElem True) grid xs
+
+-- Update existing ship on primary grid
+updateExistingShip :: ShipType -> [ShipType] -> [ShipType]
+updateExistingShip ship ships =
+  case elem ship ships of
+    True -> ships
+    _ -> ship : ships
 
 -- Place a new type of ship onto primary grid only if space avaliable
 placeShip :: Coordinate -> Direction -> ShipType -> Scene -> Scene
 placeShip coord dir ship scene =
   case invalidPlacement of
     True -> scene
-    False -> scene
+    False ->
+      Scene
+        (updatePrimaryGrid proposedShip $ myPrimaryGrid scene)
+        (updateExistingShip ship $ myShips scene)
   where
     proposedShip = shipCoordinate coord dir ship
     grid = myPrimaryGrid scene
     isAlreadyPlaced = elem ship (myShips scene)
-    isNotInBound = not $ all (flip inBound grid) proposedShip
+    isNotInBound = not $ all (`inBound` grid) proposedShip
     isNotAvaliable = isOccupied proposedShip grid
     invalidPlacement = isAlreadyPlaced || isNotInBound || isNotAvaliable -- should short circuit
 
@@ -171,3 +186,6 @@ grid3 = setElem True (3, 5) grid2
 scene = Scene testPrimaryGrid [carrier, cruiser]
 
 scene' = placeShip (1, 1) TailLeft destroyer scene
+
+--placeShip :: Coordinate -> Direction -> ShipType -> Scene -> Scene
+scene'' = placeShip (6, 7) TailUp cruiser scene'
