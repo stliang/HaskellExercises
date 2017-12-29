@@ -1,14 +1,6 @@
 {-|
 Description : Battleship game - https://en.wikipedia.org/wiki/Battleship_(game)
 
-This Battleship game has a flixable grid size. An example of a grid size is 10 x 10 
-where the top left corner position is (1,1), left bottom is (1,10) and right
-bottom is (10,10).  The coordinate is represented by a tuple of Int not Int and Char.
-Fist Int is "i" or row and the other Int is "j" which is column number. 
-
-The primary grid is your side while the target grid represents
-your opponent's primary grid.  You may place a number of ships into the primary
-grid only.
 -}
 module Battleship where
 
@@ -16,16 +8,16 @@ import Data.List
 import Data.Matrix -- Vector based matrix index starts from 1
 
 data Cell
-  = Unchecked -- Position not been attacked before
-  | Hit -- A ship occupying the position, subsequent attacks signal Taken
-  | Miss -- No ship occupies the position, subsequent attacks signal Taken
+  = Unchecked
+  | CellHit
+  | CellMiss
   deriving (Eq, Show)
 
 -- Tracking grid: your target scene
-type TrackingGrid = Matrix Cell
+type TargetingGrid = Matrix Cell
 
 -- Primary grid: your ship layout
-type PrimaryGrid = Matrix Bool -- Ship presence is True otherwise False
+type PrimaryGrid = Matrix Bool -- TODO: consider data Pcell = ShipType | Island | Water
 
 -- (i,j) coordinate representing i-th row and j-th column numbers
 type Coordinate = (Int, Int)
@@ -67,13 +59,15 @@ data Direction
 
 -- Game play states
 data Condition
-  = Won
-  | Lost
-  | Playing
+  = Win
+  | Sunk
+  | AlreadyTaken
+  | Hit
+  | Miss
 
 -- Game state at trasition
 data State = State
-  { trackingGrid :: TrackingGrid
+  { targetingGrid :: TargetingGrid
   , primaryGrid :: PrimaryGrid
   , condition :: Condition
   }
@@ -111,7 +105,7 @@ inBound (i, j) grid = i >= 1 && i <= r && j >= 1 && j <= c
     r = nrows grid
     c = ncols grid
 
--- 
+-- Gather all the ships positions on a primary grid
 -- O(r * c) complixity as accessing cell is O(1)
 allShipPositions :: PrimaryGrid -> [Coordinate]
 allShipPositions grid = [(i, j) | i <- [1 .. r], j <- [1 .. c], getElem i j grid]
@@ -162,10 +156,46 @@ placeShip coord dir ship scene =
 emptyPrimaryGrid :: Int -> Int -> PrimaryGrid
 emptyPrimaryGrid r c = matrix r c $ \(i, j) -> False
 
-blankTrackingGrid :: Int -> Int -> TrackingGrid
-blankTrackingGrid r c = matrix r c $ \(i, j) -> Unchecked
+blankTargetingGrid :: Int -> Int -> TargetingGrid
+blankTargetingGrid r c = matrix r c $ \(i, j) -> Unchecked
 
 showGrid
   :: Show a
   => Matrix a -> IO ()
 showGrid m = putStrLn $ prettyMatrix m
+
+-- Check if a ship is in a given position
+isShipAt :: Coordinate -> PrimaryGrid -> Bool
+isShipAt (i, j) grid = getElem i j grid -- NOTE: Might need to case of what a cell means
+
+{-|
+consecutiveShipPostion :: Coordinate -> PrimaryGrid -> [Coordinate]
+consecutiveShipPostion (i, j) grid = (i, j) `elem` allShips
+  where
+    allShips = --allShipPositions grid
+-}
+-- With your opponent's PrimaryGrid, making a move updates your TargetingGrid and the game Condition
+attack :: [Coordinate] -> State -> State
+attack [] state = state
+attack (x:xs) state = attack xs (f x)
+  where
+    t = targetingGrid state
+    o = primaryGrid state
+    c = condition state
+    updateTargetingGrid (i, j) x = setElem x (i, j) t
+    f (i, j) =
+      let targetingCell = getElem i j t
+          opponentCell = getElem i j o
+      in case targetingCell of
+           Unchecked ->
+             case opponentCell of
+               True -> State (updateTargetingGrid (i, j) CellHit) o Hit
+               _ -> State (updateTargetingGrid (i, j) CellMiss) o Miss
+           CellHit ->
+             case opponentCell of
+               True -> State t o AlreadyTaken
+               _ -> State (updateTargetingGrid (i, j) CellMiss) o Miss
+           CellMiss ->
+             case opponentCell of
+               True -> State (updateTargetingGrid (i, j) CellHit) o Hit
+               _ -> State t o Miss

@@ -95,7 +95,7 @@ spec =
           listCell = toList grid
       foldr (||) False listCell `shouldBe` False
     it "a new empty targeting grid has all cells equal to Unchecked" $ do
-      let grid = blankTrackingGrid 10 10
+      let grid = blankTargetingGrid 10 10
           listCell =
             fmap
               (\x ->
