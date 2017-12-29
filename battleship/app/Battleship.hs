@@ -12,6 +12,7 @@ grid only.
 -}
 module Battleship where
 
+import Data.List
 import Data.Matrix -- Vector based matrix index starts from 1
 
 data Cell
@@ -28,9 +29,6 @@ type PrimaryGrid = Matrix Bool -- Ship presence is True otherwise False
 -- (i,j) coordinate representing i-th row and j-th column numbers
 type Coordinate = (Int, Int)
 
-class Size a where
-  size :: a -> (Int, Int)
-
 data ShipType
   = Carrier
   | Battleship
@@ -39,12 +37,25 @@ data ShipType
   | Destroyer
   deriving (Eq, Show)
 
-instance Size ShipType where
-  size Carrier = (1, 5)
-  size Battleship = (1, 4)
-  size Cruiser = (1, 3)
-  size Submarine = (1, 3)
-  size Destroyer = (1, 2)
+type ShipeWidth = Int
+
+type ShipLength = Int
+
+data ShipDim = ShipDim
+  { shipWidth :: Int
+  , shipLength :: Int
+  , shipHeight :: Int
+  } deriving (Show)
+
+class ShipSize a where
+  dim :: a -> ShipDim
+
+instance ShipSize ShipType where
+  dim Carrier = ShipDim 1 5 1
+  dim Battleship = ShipDim 1 4 1
+  dim Cruiser = ShipDim 1 3 1
+  dim Submarine = ShipDim 1 3 1
+  dim Destroyer = ShipDim 1 2 1
 
 -- Valid ship placement directions
 data Direction
@@ -75,44 +86,66 @@ data Scene = Scene
 
 -- Get the Coordinates of a proposed ship position
 shipCoordinate
-  :: Size a
-  => a -> Coordinate -> Direction -> [Coordinate]
-shipCoordinate ship (i, j) dir =
+  :: ShipSize shipType
+  => Coordinate -> Direction -> shipType -> [Coordinate]
+shipCoordinate (i, j) dir ship =
   case dir of
-    TailUp -> go negate shipSize
-    TailDown -> go id shipSize
-    TailLeft -> go' negate shipSize
-    TailRight -> go' id shipSize
+    TailUp -> goUD negate sl
+    TailDown -> goUD id sl
+    TailLeft -> goLR negate sl
+    TailRight -> goLR id sl
   where
-    shipSize = snd (size ship) - 1
-    go :: (Int -> Int) -> Int -> [Coordinate]
-    go _ 0 = (i, j) : []
-    go f x = (i + (f x), j) : go f (x - 1)
-    go' :: (Int -> Int) -> Int -> [Coordinate]
-    go' _ 0 = (i, j) : []
-    go' f x = (1, (j + (f x))) : go f (x - 1)
+    sl = (shipLength $ dim ship) - 1 -- Minus one because counting down from shipLength
+    goUD :: (Int -> Int) -> Int -> [Coordinate]
+    goUD _ 0 = (i, j) : []
+    goUD f x = (i + (f x), j) : goUD f (x - 1)
+    goLR :: (Int -> Int) -> Int -> [Coordinate]
+    goLR _ 0 = (i, j) : []
+    goLR f x = (i, (j + (f x))) : goLR f (x - 1)
 
 -- Check if a Coordinate is within the bound of a given grid
-inBound :: PrimaryGrid -> Coordinate -> Bool
-inBound = undefined
+inBound :: Coordinate -> PrimaryGrid -> Bool
+inBound (i, j) grid = i >= 1 && i <= r && j >= 1 && j <= c
+  where
+    r = nrows grid
+    c = ncols grid
 
--- Get the surounding cells of a given list of coordinates
+-- 
+-- O(r * c) complixity as accessing cell is O(1)
+allShipPositions :: PrimaryGrid -> [Coordinate]
+allShipPositions grid = [(i, j) | i <- [1 .. r], j <- [1 .. c], getElem i j grid]
+  where
+    r = nrows grid
+    c = ncols grid
+
+-- Get the surrounding cells of a given list of coordinates
 neighbourCells :: [Coordinate] -> [Coordinate]
-neighbourCells = undefined
+neighbourCells coords = go coords []
+  where
+    lr (i, j) = [(i, j - 1), (i, j + 1)]
+    tb (i, j) = [(i + 1, j), (i - 1, j)]
+    go [] acc = acc
+    go (x:xs) acc = go xs ((lr x) ++ (tb x) ++ acc)
 
--- Check if there is a ship located at the given position
-isShipAtCoordinate :: PrimaryGrid -> Coordinate -> Bool
-isShipAtCoordinate = undefined
+-- Check if the proposed site is already occupied
+isOccupied :: [Coordinate] -> PrimaryGrid -> Bool
+isOccupied coords grid = all (\(i, j) -> not $ getElem i j grid) proposed
+  where
+    proposed = filter (flip inBound $ grid) $ nub $ neighbourCells coords ++ coords
 
-placeShip :: ShipType -> Scene -> Coordinate -> Direction -> Scene
-placeShip ship scene coord dir =
-  case validPlacement of
+-- Place a new type of ship onto primary grid only if space avaliable
+placeShip :: Coordinate -> Direction -> ShipType -> Scene -> Scene
+placeShip coord dir ship scene =
+  case invalidPlacement of
     True -> scene
     False -> scene
   where
-    existingShip = not (elem ship (myShips scene))
-    validPlacement :: Bool
-    validPlacement = existingShip || False
+    proposedShip = shipCoordinate coord dir ship
+    grid = myPrimaryGrid scene
+    isAlreadyPlaced = elem ship (myShips scene)
+    isNotInBound = not $ all (flip inBound grid) proposedShip
+    isNotAvaliable = isOccupied proposedShip grid
+    invalidPlacement = isAlreadyPlaced || isNotInBound || isNotAvaliable -- should short circuit
 
 -- Test data:
 carrier = Carrier
@@ -129,6 +162,12 @@ testTargetingGrid = (matrix 10 10 $ \(i, j) -> Unchecked) :: TrackingGrid
 
 testPrimaryGrid = (matrix 10 10 $ \(i, j) -> False) :: PrimaryGrid
 
+grid1 = setElem True (3, 3) testPrimaryGrid
+
+grid2 = setElem True (3, 4) grid1
+
+grid3 = setElem True (3, 5) grid2
+
 scene = Scene testPrimaryGrid [carrier, cruiser]
 
-scene' = placeShip destroyer scene (1, 1) TailLeft
+scene' = placeShip (1, 1) TailLeft destroyer scene
