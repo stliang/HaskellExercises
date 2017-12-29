@@ -110,3 +110,48 @@ spec =
                    else True) $
             toList grid
       foldr (||) False listCell `shouldBe` False
+    it "check an existing Battleship placed at (6,3) equals True" $ do
+      let scene = Scene (emptyPrimaryGrid 10 10) []
+          scene' = placeShip (6, 3) TailUp Battleship scene
+      isShipAt (6, 3) (myPrimaryGrid scene') `shouldBe` True
+    it "get positions of one Battleship placed at (6,3) equals [(3, 3), (4, 3), (5, 3), (6, 3)]" $ do
+      let scene = Scene (emptyPrimaryGrid 10 10) []
+          scene' = placeShip (6, 3) TailUp Battleship scene
+      oneShipPositions Battleship (myPrimaryGrid scene') `shouldBe` [(3, 3), (4, 3), (5, 3), (6, 3)]
+    it "check if sections of ship got hit on an unharmed Battleship equa False" $ do
+      let scene = Scene (emptyPrimaryGrid 10 10) []
+          targetingGrid = blankTargetingGrid 10 10
+          scene' = placeShip (6, 3) TailUp Battleship scene
+      isOneShipAllHit Battleship (myPrimaryGrid scene') targetingGrid `shouldBe` False
+    it "check if sections of ship got hit on sunk Battleship equals True" $ do
+      let scene = Scene (emptyPrimaryGrid 10 10) []
+          scene' = placeShip (6, 3) TailUp Battleship scene
+          targetingGrid = blankTargetingGrid 10 10
+          targetingGrid' = setElem CellHit (6, 3) targetingGrid
+          targetingGrid'' = setElem CellHit (4, 3) targetingGrid'
+          targetingGrid''' = setElem CellHit (5, 3) targetingGrid''
+          targetingGrid'''' = setElem CellHit (3, 3) targetingGrid'''
+      isOneShipAllHit Battleship (myPrimaryGrid scene') targetingGrid'''' `shouldBe` True
+    it "get the shiptype of a Battleship place at (6,3) equals to Battleship" $ do
+      let scene = Scene (emptyPrimaryGrid 10 10) []
+          scene' = placeShip (6, 3) TailUp Battleship scene
+      getPrimaryCellType (6, 3) (myPrimaryGrid scene') `shouldBe` Battleship
+    it "when last ship is sunk, check if won equals True" $ do
+      let scene = Scene (emptyPrimaryGrid 10 10) []
+          scene' = placeShip (6, 3) TailUp Battleship scene
+          targetingGrid = blankTargetingGrid 10 10
+          targetingGrid' = setElem CellHit (6, 3) targetingGrid
+          targetingGrid'' = setElem CellHit (4, 3) targetingGrid'
+          targetingGrid''' = setElem CellHit (5, 3) targetingGrid''
+          targetingGrid'''' = setElem CellHit (3, 3) targetingGrid'''
+      won (myPrimaryGrid scene') targetingGrid'''' `shouldBe` True
+    it "when last ship is sunk, check if won equals True" $ do
+      let scene = Scene (emptyPrimaryGrid 10 10) []
+          targetingGrid = blankTargetingGrid 10 10
+          scene' = placeShip (6, 3) TailUp Battleship scene
+          primaryGrid = myPrimaryGrid scene'
+          state = State targetingGrid primaryGrid Start
+          targetList = [(3, 3), (4, 3), (5, 3), (6, 3)]
+          state' = attack targetList state
+          cond = condition state'
+      cond `shouldBe` Win

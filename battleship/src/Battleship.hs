@@ -70,6 +70,8 @@ data Condition
   | AlreadyTaken
   | Hit
   | Miss
+  | Start
+  deriving (Eq, Show)
 
 -- Game state at trasition
 data State = State
@@ -177,15 +179,39 @@ showGrid m = putStrLn $ prettyMatrix m
 isShipAt :: Coordinate -> PrimaryGrid -> Bool
 isShipAt (i, j) grid = getElem i j grid `elem` listOfShipType
 
-{-|
-consecutiveShipPostion :: Coordinate -> PrimaryGrid -> [Coordinate]
-consecutiveShipPostion (i, j) grid = (i, j) `elem` allShips
+-- Locate consecutive position of one type of ship
+oneShipPositions :: PrimaryCell -> PrimaryGrid -> [Coordinate]
+oneShipPositions primaryCell grid =
+  [(i, j) | i <- [1 .. r], j <- [1 .. c], (getElem i j grid) == primaryCell]
   where
-    allShips = --allShipPositions grid
--}
+    r = nrows grid
+    c = ncols grid
+
+-- Findout if a type of ship is all hit
+isOneShipAllHit :: PrimaryCell -> PrimaryGrid -> TargetingGrid -> Bool
+isOneShipAllHit ship primaryGrid targetingGrid =
+  all (\(i, j) -> (getElem i j targetingGrid == CellHit)) coords
+  where
+    coords = oneShipPositions ship primaryGrid
+
+-- get primary cell type
+getPrimaryCellType :: Coordinate -> PrimaryGrid -> PrimaryCell
+getPrimaryCellType (i, j) grid = getElem i j grid
+
+-- Findout if all ships are Sunk and the game is won
+won :: PrimaryGrid -> TargetingGrid -> Bool
+won primaryGrid targetingGrid =
+  all (\x -> isOneShipAllHit x primaryGrid targetingGrid) listOfShipType
+
 -- With your opponent's PrimaryGrid, making a move updates your TargetingGrid and the game Condition
 attack :: [Coordinate] -> State -> State
-attack [] state = state
+attack [] state =
+  if (won o t)
+    then State t o Win
+    else state
+  where
+    t = targetingGrid state
+    o = primaryGrid state
 attack (x:xs) state = attack xs (f x)
   where
     t = targetingGrid state
@@ -194,11 +220,14 @@ attack (x:xs) state = attack xs (f x)
     updateTargetingGrid (i, j) x = setElem x (i, j) t
     f (i, j) =
       let targetingCell = getElem i j t
-          opponentCell = True -- getElem i j o == undefined
+          opponentCell = getElem i j o `elem` listOfShipType
       in case targetingCell of
            Unchecked ->
              case opponentCell of
-               True -> State (updateTargetingGrid (i, j) CellHit) o Hit
+               True ->
+                 if (isOneShipAllHit (getElem i j o) o t)
+                   then State (updateTargetingGrid (i, j) CellHit) o Sunk
+                   else State (updateTargetingGrid (i, j) CellHit) o Hit
                _ -> State (updateTargetingGrid (i, j) CellMiss) o Miss
            CellHit ->
              case opponentCell of
@@ -206,5 +235,8 @@ attack (x:xs) state = attack xs (f x)
                _ -> State (updateTargetingGrid (i, j) CellMiss) o Miss
            CellMiss ->
              case opponentCell of
-               True -> State (updateTargetingGrid (i, j) CellHit) o Hit
+               True ->
+                 if (isOneShipAllHit (getElem i j o) o t)
+                   then State (updateTargetingGrid (i, j) CellHit) o Sunk
+                   else State (updateTargetingGrid (i, j) CellHit) o Hit
                _ -> State t o Miss
