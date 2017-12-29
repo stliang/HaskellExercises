@@ -47,13 +47,13 @@ spec =
           scene' = placeShip (5, 5) TailLeft Destroyer scene
           grid = myPrimaryGrid scene'
       isNotOccupied [(5, 7)] grid `shouldBe` True
-    it "updatePrimaryGrid for Destroyer at (5,5) has (5,5) (5,4) set to True" $ do
+    it "updatePrimaryGrid for Destroyer at (5,5) has (5,5) (5,4) set to Destroyer" $ do
       let scene = Scene (emptyPrimaryGrid 10 10) []
           grid = myPrimaryGrid scene
           proposedShip = shipCoordinate (5, 5) TailLeft Destroyer
-          grid' = updatePrimaryGrid proposedShip grid
-          b1 = getElem 5 5 grid'
-          b2 = getElem 5 4 grid'
+          grid' = updatePrimaryGrid Destroyer proposedShip grid
+          b1 = getElem 5 5 grid' == Destroyer
+          b2 = getElem 5 4 grid' == Destroyer
       b1 && b2 `shouldBe` True
     it "when a ship already added, the ship registery should not change" $ do
       let shipRegistery = [Destroyer, Cruiser]
@@ -92,7 +92,13 @@ spec =
     it "a new empty primary grid has all cells equal to False" $ do
       let scene = Scene (emptyPrimaryGrid 10 10) []
           grid = myPrimaryGrid scene
-          listCell = toList grid
+          listCell =
+            fmap
+              (\x ->
+                 if x == Water
+                   then False
+                   else True) $
+            toList grid
       foldr (||) False listCell `shouldBe` False
     it "a new empty targeting grid has all cells equal to Unchecked" $ do
       let grid = blankTargetingGrid 10 10
