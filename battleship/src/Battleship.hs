@@ -199,44 +199,15 @@ getPrimaryCellType :: Coordinate -> PrimaryGrid -> PrimaryCell
 getPrimaryCellType (i, j) grid = getElem i j grid
 
 -- Findout if all ships are Sunk and the game is won
+-- TODO 
 won :: PrimaryGrid -> TargetingGrid -> Bool
 won primaryGrid targetingGrid =
   all (\x -> isOneShipAllHit x primaryGrid targetingGrid) listOfShipType
 
--- With your opponent's PrimaryGrid, making a move updates your TargetingGrid and the game Condition
-attack :: [Coordinate] -> State -> State
-attack [] state =
-  if (won o t)
-    then State t o Win
-    else state
-  where
-    t = targetingGrid state
-    o = primaryGrid state
-attack (x:xs) state = attack xs (f x)
-  where
-    t = targetingGrid state
-    o = primaryGrid state
-    c = condition state
-    updateTargetingGrid (i, j) x = setElem x (i, j) t
-    f (i, j) =
-      let targetingCell = getElem i j t
-          opponentCell = getElem i j o `elem` listOfShipType
-      in case targetingCell of
-           Unchecked ->
-             case opponentCell of
-               True ->
-                 if (isOneShipAllHit (getElem i j o) o t)
-                   then State (updateTargetingGrid (i, j) CellHit) o Sunk
-                   else State (updateTargetingGrid (i, j) CellHit) o Hit
-               _ -> State (updateTargetingGrid (i, j) CellMiss) o Miss
-           CellHit ->
-             case opponentCell of
-               True -> State t o AlreadyTaken
-               _ -> State (updateTargetingGrid (i, j) CellMiss) o Miss
-           CellMiss ->
-             case opponentCell of
-               True ->
-                 if (isOneShipAllHit (getElem i j o) o t)
-                   then State (updateTargetingGrid (i, j) CellHit) o Sunk
-                   else State (updateTargetingGrid (i, j) CellHit) o Hit
-               _ -> State t o Miss
+-- elementwise :: (a -> b -> c) -> Matrix a -> Matrix b -> Matrix c
+mergeToTargetingGrid :: PrimaryGrid -> TargetingGrid -> TargetingGrid
+mergeToTargetingGrid primaryGrid targetingGrid = elementwise (\x y -> (x, y))
+
+-- 
+attack :: Coordinate -> PrimaryGrid -> TargetingGrid -> State
+attack = undefined

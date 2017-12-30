@@ -155,3 +155,14 @@ spec =
           state' = attack targetList state
           cond = condition state'
       cond `shouldBe` Win
+    it "when hitting all sections of a ship and the game is not won, the condition equals Sunk" $ do
+      let scene = Scene (emptyPrimaryGrid 10 10) []
+          targetingGrid = blankTargetingGrid 10 10
+          scene' = placeShip (6, 3) TailUp Battleship scene
+          scene'' = placeShip (1, 1) TailRight Destroyer scene'
+          primaryGrid = myPrimaryGrid scene''
+          state = State targetingGrid primaryGrid Start
+          targetList = [(3, 3), (4, 3), (5, 3), (6, 3)]
+          state' = attack targetList state
+          cond = condition state'
+      cond `shouldBe` Sunk
