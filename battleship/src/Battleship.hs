@@ -5,93 +5,75 @@ Description : Battleship game - https://en.wikipedia.org/wiki/Battleship_(game)
 module Battleship where
 
 import Data.List
-import Data.Matrix -- Vector based matrix index starts from 1
 
-data TargetingCell
-  = Unchecked
-  | CellHit
-  | CellMiss
-  deriving (Eq, Show)
+-- | Matrix index starts from 1 and has access complexity of O(1)
+import Data.Matrix
+import TargetingGridTypes
+import Types
 
--- Tracking grid: your target scene
+-- | A targeting grid that tracks the result of attacks
 type TargetingGrid = Matrix TargetingCell
 
--- Primary grid: your ship layout
-type PrimaryGrid = Matrix PrimaryCell
+-- | A grid where ships can be placed
+type ShipGrid = Matrix Maybe ShipType
 
--- (i,j) coordinate representing i-th row and j-th column numbers
+-- | A grid describs the locations of land masses
+type LandGrid = Matrix Maybe LandType
+
+-- | (i,j) coordinate representing i-th row and j-th column numbers
+-- When used in ship placement, it represents the bow
 type Coordinate = (Int, Int)
-
-data PrimaryCell
-  = Carrier
-  | Battleship
-  | Cruiser
-  | Submarine
-  | Destroyer
-  | Island
-  | Water
-  deriving (Enum, Eq, Show)
-
-listOfShipType = [Carrier, Battleship, Cruiser, Submarine, Destroyer]
 
 type ShipeWidth = Int
 
 type ShipLength = Int
 
+-- | Dimension describs objects in a game
 data Dim = Dim
   { getWidth :: Int
   , getLength :: Int
   , getHeight :: Int
   } deriving (Show)
 
+-- | Type class enforces correctness of function processing sizeness
 class Size a where
   dim :: a -> Dim
 
-instance Size PrimaryCell where
+-- | Valid sizes for each ship type
+instance Size ShipType where
   dim Carrier = Dim 1 5 1
   dim Battleship = Dim 1 4 1
   dim Cruiser = Dim 1 3 1
   dim Submarine = Dim 1 3 1
   dim Destroyer = Dim 1 2 1
-  dim Island = Dim 1 1 1
-  dim Water = Dim 10 10 1
 
--- Valid ship placement directions
-data Direction
-  = TailUp
-  | TailDown
-  | TailLeft
-  | TailRight
-
--- Game play states
-data Condition
-  = Win
-  | Sunk
-  | AlreadyTaken
-  | Hit
-  | Miss
-  | Start
-  deriving (Eq, Show)
-
--- Game state at trasition
+-- | Game state at trasition
 data State = State
   { targetingGrid :: TargetingGrid
-  , primaryGrid :: PrimaryGrid
+  , shipGrid :: ShipGrid
   , condition :: Condition
   }
 
--- A Scene is the primary grid and the ships placed in it.
--- It is a Data struture to hold a built out battle formation before game play
+-- | A Scene reflects the states of a game after each move is made
 data Scene = Scene
-  { myPrimaryGrid :: PrimaryGrid
-  , myShips :: [PrimaryCell]
+  { myShipGrid :: ShipGrid
+  , myShips :: [ShipType]
   } deriving (Show)
 
--- Get the Coordinates of a proposed ship position
--- TODO shipType should be object with size
+-- | Type of ship placement errors
+data PlacementError
+  = AlreadyPlaced
+  | NotInBound
+  | NotAvaliable
+  deriving (Enum, Eq, Show)
+
+-- | Get the Coordinates of a proposed ship position
 shipCoordinate
   :: Size shipType
-  => Coordinate -> Direction -> shipType -> [Coordinate]
+  => Coordinate -- ^ grid position of the ship bow
+  -> Direction -- ^ the stern direction
+  -> shipType -- ^ ShipType is an instance of Size class
+  -> [Coordinate] -- ^ coordinates of a ship regardless of grid dimension
 shipCoordinate (i, j) dir ship =
   case dir of
     TailUp -> goUD negate sl
@@ -107,107 +89,122 @@ shipCoordinate (i, j) dir ship =
     goLR _ 0 = [(i, j)]
     goLR f x = (i, j + f x) : goLR f (x - 1)
 
--- Check if a Coordinate is within the bound of a given grid
-inBound :: Coordinate -> PrimaryGrid -> Bool
+-- | Check if a Coordinate is within the bound of a given grid
+inBound :: Coordinate -> ShipGrid -> Bool
 inBound (i, j) grid = i >= 1 && i <= r && j >= 1 && j <= c
   where
     r = nrows grid
     c = ncols grid
 
--- Gather all the ships positions on a primary grid
--- O(r * c * listOfShipType) complixity as accessing cell is O(1)
-allShipPositions :: PrimaryGrid -> [Coordinate]
-allShipPositions grid =
-  [(i, j) | i <- [1 .. r], j <- [1 .. c], (getElem i j grid) `elem` listOfShipType]
+-- | Gather all cell positions of a ship type
+shipPositions :: ShipType -> ShipGrid -> [Coordinate]
+shipPositions ship grid = [(i, j) | i <- [1 .. r], j <- [1 .. c], (getElem i j grid) == ship]
   where
     r = nrows grid
     c = ncols grid
 
--- Get the surrounding cells of a given list of coordinates
+-- | A list of valid ship types
+listOfShipType :: [ShipType]
+listOfShipType = enumFrom . (toEnum 0)
+
+-- | All positions of all ship types
+allShipPositions :: ShipGrid -> [Coordinate]
+allShipPositions grid =
+  foldr (\shipType acc -> shipPositions shipType grid ++ acc) [] listOfShipType
+
+-- | Get the surrounding cells of a given list of coordinates
 neighbourCells :: [Coordinate] -> [Coordinate]
 neighbourCells = foldr (\x acc -> lr x ++ tb x ++ acc) []
   where
     lr (i, j) = [(i, j - 1), (i, j + 1)]
     tb (i, j) = [(i + 1, j), (i - 1, j)]
 
--- Check if the proposed site is already occupied
-isNotOccupied :: [Coordinate] -> PrimaryGrid -> Bool
+-- | Check if the proposed site is not already occupied
+isNotOccupied :: [Coordinate] -> ShipGrid -> Bool
 isNotOccupied coords grid = all (\(i, j) -> not $ (getElem i j grid) `elem` listOfShipType) proposed
   where
     proposed = filter (`inBound` grid) $ nub $ neighbourCells coords ++ coords
 
--- Update primary grid with ship placement
-updatePrimaryGrid :: PrimaryCell -> [Coordinate] -> PrimaryGrid -> PrimaryGrid
-updatePrimaryGrid primaryCell xs grid = foldr (setElem primaryCell) grid xs
+-- | Update ship grid with ship placement
+updateShipGrid :: ShipType -> [Coordinate] -> ShipGrid -> ShipGrid
+updateShipGrid ship coord grid = foldr (setElem ship) grid coord
 
--- Update existing ship on primary grid
-updateMyShipRegistery :: PrimaryCell -> [PrimaryCell] -> [PrimaryCell]
-updateMyShipRegistery ship ships =
+-- | Update ship registry
+updateShipRegistery :: ShipType -> [ShipType] -> [ShipType]
+updateShipRegistery ship ships =
   if ship `elem` ships
     then ships
     else ship : ships
 
--- Place a new type of ship onto primary grid only if space avaliable
--- TODO PrimaryCell ambiguous rethink data structure
-placeShip :: Coordinate -> Direction -> PrimaryCell -> Scene -> Scene
-placeShip coord dir ship scene =
-  if invalidPlacement
-    then scene
-    else Scene
-           (updatePrimaryGrid ship proposedShip $ myPrimaryGrid scene)
-           (updateMyShipRegistery ship $ myShips scene)
+-- | Place a type of ship onto ship grid only if space is avaliable
+placeShip
+  :: Coordinate -- ^ Bow position
+  -> Direction -- ^ Direction of stern
+  -> ShipType -- ^ An instance of a ship type
+  -> Scene -- ^ Given a scene to place ship in
+  -> Either Scene -- ^ Either return a Right of valid scene or Left of PlacementError
+placeShip coord dir ship scene
+  | isAlreadyPlaced = Left AlreadyPlaced
+  | isNotInBound = Left NotInBound
+  | isNotAvaliable = Left NotAvaliable
+  | otherwise =
+    Right
+      Scene
+      (updateShipGrid ship proposedShip $ myShipGrid scene)
+      (updateMyShipRegistery ship $ myShips scene)
   where
     proposedShip = shipCoordinate coord dir ship
-    grid = myPrimaryGrid scene
-    isAlreadyPlaced = ship `elem` myShips scene
+    grid = myShipGrid scene
+    isAlreadyPlaced = ship `elem` myShips scene -- limits one ship per type in this version
     isNotInBound = not $ all (`inBound` grid) proposedShip
     isNotAvaliable = not $ isNotOccupied proposedShip grid
-    invalidPlacement = isAlreadyPlaced || isNotInBound || isNotAvaliable -- should short circuit
 
-emptyPrimaryGrid :: Int -> Int -> PrimaryGrid
-emptyPrimaryGrid r c = matrix r c $ \(i, j) -> Water
+-- | Generate an ship grid with no ships
+emptyShipGrid :: Int -> Int -> ShipGrid
+emptyShipGrid r c = matrix r c $ \(i, j) -> Nothing
 
+-- | Generate a targeting grid with all unchecked cells
 blankTargetingGrid :: Int -> Int -> TargetingGrid
 blankTargetingGrid r c = matrix r c $ \(i, j) -> Unchecked
 
+-- | Show the conthen of a matrix
 showGrid
   :: Show a
   => Matrix a -> IO ()
 showGrid m = putStrLn $ prettyMatrix m
 
--- Check if a ship is in a given position
-isShipAt :: Coordinate -> PrimaryGrid -> Bool
+-- | Check if a ship is in a given position
+isShipAt :: Coordinate -> ShipGrid -> Bool
 isShipAt (i, j) grid = getElem i j grid `elem` listOfShipType
 
--- Locate consecutive position of one type of ship
-oneShipPositions :: PrimaryCell -> PrimaryGrid -> [Coordinate]
-oneShipPositions primaryCell grid =
-  [(i, j) | i <- [1 .. r], j <- [1 .. c], (getElem i j grid) == primaryCell]
+-- | Locate consecutive position of one type of ship
+oneShipPositions :: ShipType -> ShipGrid -> [Coordinate]
+oneShipPositions ship grid =
+  [(i, j) | i <- [1 .. r], j <- [1 .. c], (getElem i j grid) == Just ship]
   where
     r = nrows grid
     c = ncols grid
 
--- Findout if a type of ship is all hit
-isOneShipAllHit :: PrimaryCell -> PrimaryGrid -> TargetingGrid -> Bool
-isOneShipAllHit ship primaryGrid targetingGrid =
-  all (\(i, j) -> (getElem i j targetingGrid == CellHit)) coords
+-- | Findout if a type of ship is all hit
+isOneShipAllHit :: ShipType -> ShipGrid -> TargetingGrid -> Bool
+isOneShipAllHit ship shipGrid targetingGrid =
+  all (\(i, j) -> (getElem i j targetingGrid == T.Hit)) coords
   where
-    coords = oneShipPositions ship primaryGrid
+    coords = oneShipPositions ship shipGrid
 
--- get primary cell type
-getPrimaryCellType :: Coordinate -> PrimaryGrid -> PrimaryCell
-getPrimaryCellType (i, j) grid = getElem i j grid
+-- | Get ship grid cell type
+getShipTypeType :: Coordinate -> ShipGrid -> Maybe ShipType
+getShipTypeType (i, j) grid = getElem i j grid
 
--- Findout if all ships are Sunk and the game is won
--- TODO 
-won :: PrimaryGrid -> TargetingGrid -> Bool
-won primaryGrid targetingGrid =
-  all (\x -> isOneShipAllHit x primaryGrid targetingGrid) listOfShipType
+-- | Findout if all ships are Sunk and the game is won
+-- TODO search for a single ship position that is unchecked
+won :: ShipGrid -> TargetingGrid -> Bool
+won shipGrid targetingGrid = all (\x -> isOneShipAllHit x shipGrid targetingGrid) listOfShipType
 
 -- elementwise :: (a -> b -> c) -> Matrix a -> Matrix b -> Matrix c
-mergeToTargetingGrid :: PrimaryGrid -> TargetingGrid -> TargetingGrid
-mergeToTargetingGrid primaryGrid targetingGrid = elementwise (\x y -> (x, y))
+mergeToTargetingGrid :: ShipGrid -> TargetingGrid -> TargetingGrid
+mergeToTargetingGrid shipGrid targetingGrid = elementwise (\x y -> (x, y)) shipGrid targetingGrid
 
--- 
-attack :: Coordinate -> PrimaryGrid -> TargetingGrid -> State
+-- | TODO implement attack with a number of filter, fold, elementwise operations on two or more matrix
+attack :: Coordinate -> ShipGrid -> TargetingGrid -> State
 attack = undefined
