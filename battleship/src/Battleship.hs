@@ -1,6 +1,8 @@
 {-|
 Description : Battleship game - https://en.wikipedia.org/wiki/Battleship_(game)
 
+This version of Battleship can only have one ship per ShipType be placed
+on ShipGrid.
 -}
 module Battleship where
 
@@ -8,17 +10,17 @@ import Data.List
 
 -- | Matrix index starts from 1 and has access complexity of O(1)
 import Data.Matrix
-import TargetingGridTypes
+import TargetingGridTypes as T
 import Types
 
 -- | A targeting grid that tracks the result of attacks
-type TargetingGrid = Matrix TargetingCell
+type TargetingGrid = Matrix T.TargetingCell
 
 -- | A grid where ships can be placed
-type ShipGrid = Matrix Maybe ShipType
+type ShipGrid = Matrix (Maybe ShipType)
 
 -- | A grid describs the locations of land masses
-type LandGrid = Matrix Maybe LandType
+type LandGrid = Matrix (Maybe LandType)
 
 -- | (i,j) coordinate representing i-th row and j-th column numbers
 -- When used in ship placement, it represents the bow
@@ -98,14 +100,14 @@ inBound (i, j) grid = i >= 1 && i <= r && j >= 1 && j <= c
 
 -- | Gather all cell positions of a ship type
 shipPositions :: ShipType -> ShipGrid -> [Coordinate]
-shipPositions ship grid = [(i, j) | i <- [1 .. r], j <- [1 .. c], (getElem i j grid) == ship]
+shipPositions ship grid = [(i, j) | i <- [1 .. r], j <- [1 .. c], (getElem i j grid) == Just ship]
   where
     r = nrows grid
     c = ncols grid
 
 -- | A list of valid ship types
 listOfShipType :: [ShipType]
-listOfShipType = enumFrom . (toEnum 0)
+listOfShipType = enumFrom  (toEnum 0 :: ShipType)
 
 -- | All positions of all ship types
 allShipPositions :: ShipGrid -> [Coordinate]
@@ -121,13 +123,13 @@ neighbourCells = foldr (\x acc -> lr x ++ tb x ++ acc) []
 
 -- | Check if the proposed site is not already occupied
 isNotOccupied :: [Coordinate] -> ShipGrid -> Bool
-isNotOccupied coords grid = all (\(i, j) -> not $ (getElem i j grid) `elem` listOfShipType) proposed
+isNotOccupied coords grid = all (\(i, j) -> (getElem i j grid) == Nothing) proposed
   where
     proposed = filter (`inBound` grid) $ nub $ neighbourCells coords ++ coords
 
 -- | Update ship grid with ship placement
 updateShipGrid :: ShipType -> [Coordinate] -> ShipGrid -> ShipGrid
-updateShipGrid ship coord grid = foldr (setElem ship) grid coord
+updateShipGrid ship coord grid = foldr (setElem $ Just ship) grid coord
 
 -- | Update ship registry
 updateShipRegistery :: ShipType -> [ShipType] -> [ShipType]
@@ -142,16 +144,16 @@ placeShip
   -> Direction -- ^ Direction of stern
   -> ShipType -- ^ An instance of a ship type
   -> Scene -- ^ Given a scene to place ship in
-  -> Either Scene -- ^ Either return a Right of valid scene or Left of PlacementError
+  -> Either PlacementError Scene -- ^ Either return a Right of valid scene or Left of PlacementError
 placeShip coord dir ship scene
   | isAlreadyPlaced = Left AlreadyPlaced
   | isNotInBound = Left NotInBound
   | isNotAvaliable = Left NotAvaliable
   | otherwise =
-    Right
-      Scene
+    Right $
+    Scene
       (updateShipGrid ship proposedShip $ myShipGrid scene)
-      (updateMyShipRegistery ship $ myShips scene)
+      (updateShipRegistery ship $ myShips scene)
   where
     proposedShip = shipCoordinate coord dir ship
     grid = myShipGrid scene
@@ -175,7 +177,7 @@ showGrid m = putStrLn $ prettyMatrix m
 
 -- | Check if a ship is in a given position
 isShipAt :: Coordinate -> ShipGrid -> Bool
-isShipAt (i, j) grid = getElem i j grid `elem` listOfShipType
+isShipAt (i, j) grid = getElem i j grid /= Nothing
 
 -- | Locate consecutive position of one type of ship
 oneShipPositions :: ShipType -> ShipGrid -> [Coordinate]
@@ -193,17 +195,17 @@ isOneShipAllHit ship shipGrid targetingGrid =
     coords = oneShipPositions ship shipGrid
 
 -- | Get ship grid cell type
-getShipTypeType :: Coordinate -> ShipGrid -> Maybe ShipType
-getShipTypeType (i, j) grid = getElem i j grid
+getShipType :: Coordinate -> ShipGrid -> Maybe ShipType
+getShipType (i, j) grid = getElem i j grid
 
 -- | Findout if all ships are Sunk and the game is won
 -- TODO search for a single ship position that is unchecked
 won :: ShipGrid -> TargetingGrid -> Bool
-won shipGrid targetingGrid = all (\x -> isOneShipAllHit x shipGrid targetingGrid) listOfShipType
+won shipGrid targetingGrid = undefined -- all (\x -> isOneShipAllHit x shipGrid targetingGrid) listOfShipType
 
 -- elementwise :: (a -> b -> c) -> Matrix a -> Matrix b -> Matrix c
 mergeToTargetingGrid :: ShipGrid -> TargetingGrid -> TargetingGrid
-mergeToTargetingGrid shipGrid targetingGrid = elementwise (\x y -> (x, y)) shipGrid targetingGrid
+mergeToTargetingGrid shipGrid targetingGrid = undefined -- elementwise (\x y -> (x, y)) shipGrid targetingGrid
 
 -- | TODO implement attack with a number of filter, fold, elementwise operations on two or more matrix
 attack :: Coordinate -> ShipGrid -> TargetingGrid -> State

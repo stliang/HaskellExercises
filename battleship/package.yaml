@@ -27,6 +27,8 @@ library:
   source-dirs: src
   exposed-modules:
   - Battleship
+  - Types
+  - TargetingGridTypes
   - Lib
 
 executables:
