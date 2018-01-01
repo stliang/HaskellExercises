@@ -3,6 +3,9 @@ Description : Battleship game - https://en.wikipedia.org/wiki/Battleship_(game)
 
 This version of Battleship can only have one ship per ShipType be placed
 on ShipGrid.
+
+TODO Guading coordinate out of bound
+use smart constructor or promote value to type level
 -}
 module Battleship where
 
@@ -68,6 +71,11 @@ data PlacementError
   | NotInBound
   | NotAvaliable
   deriving (Enum, Eq, Show)
+
+-- | Type of attack errors
+data AttackError
+  = OutOfBound
+  | InvalidState (Enum, Eq, Show)
 
 -- | Get the Coordinates of a proposed ship position
 shipCoordinate
@@ -144,7 +152,7 @@ placeShip
   -> Direction -- ^ Direction of stern
   -> ShipType -- ^ An instance of a ship type
   -> Scene -- ^ Given a scene to place ship in
-  -> Either PlacementError Scene -- ^ Either return a Right of valid scene or Left of PlacementError
+  -> MaybeEither PlacementError Scene -- ^ Either return a Right of valid scene or Left of PlacementError
 placeShip coord dir ship scene
   | isAlreadyPlaced = Left AlreadyPlaced
   | isNotInBound = Left NotInBound
@@ -180,36 +188,69 @@ isShipAt :: Coordinate -> ShipGrid -> Bool
 isShipAt (i, j) grid = getElem i j grid /= Nothing
 
 -- | Locate consecutive position of one type of ship
-oneShipPositions :: ShipType -> ShipGrid -> [Coordinate]
-oneShipPositions ship grid =
-  [(i, j) | i <- [1 .. r], j <- [1 .. c], (getElem i j grid) == Just ship]
+shipPositions :: ShipType -> ShipGrid -> [Coordinate]
+shipPositions ship grid = [(i, j) | i <- [1 .. r], j <- [1 .. c], (getElem i j grid) == Just ship]
   where
     r = nrows grid
     c = ncols grid
 
--- | Findout if a type of ship is all hit
-isOneShipAllHit :: ShipType -> ShipGrid -> TargetingGrid -> Bool
-isOneShipAllHit ship shipGrid targetingGrid =
-  all (\(i, j) -> (getElem i j targetingGrid == T.Hit)) coords
+-- | Findout if targeted position is already taken
+isTaken :: Coordinate -> TargetingGrid -> Bool
+isTaken coord targetingGrid = targetCell == T.Hit || targetCell == T.Miss
   where
-    coords = oneShipPositions ship shipGrid
+    targetCell = getElem i j targetingGrid
 
--- | Get ship grid cell type
-getShipGridCell :: Coordinate -> ShipGrid -> Maybe ShipType
-getShipGridCell (i, j) grid = getElem i j grid
+-- | Findout if a targeted ship has sunk
+isSunk :: Coordinate -> ShipGrid -> TargetingGrid -> Bool
+isSunk coord shipGrid targetingGrid =
+  case coords of
+    Nothing -> False -- No ship at targeted position
+    Just xs -> all (\(i, j) -> (getElem i j targetingGrid == T.Hit)) xs -- all positions hit then sunk
+  where
+    coords = do
+      ship <- getElem i j shipGrid -- find the type of ship being attcked
+      return $ shipPositions ship shipGrid -- return position of the whole ship
 
--- | Findout if all ships are Sunk and the game is won
-won :: ShipGrid -> TargetingGrid -> Bool
-won shipGrid targetingGrid = all (\(i, j) -> (targetingCell i j) == T.Hit) ships -- all func should short circuit
+-- | Findout if all ships are sunk and the game is won
+isWon :: ShipGrid -> TargetingGrid -> Bool
+isWon shipGrid targetingGrid = all (\(i, j) -> (targetingCell i j) == T.Hit) ships -- all func should short circuit
   where
     ships = allShipPositions shipGrid
     targetingCell i j = getElem i j targetingGrid
 
--- all (\x -> isOneShipAllHit x shipGrid targetingGrid) listOfShipType
--- elementwise :: (a -> b -> c) -> Matrix a -> Matrix b -> Matrix c
-mergeToTargetingGrid :: ShipGrid -> TargetingGrid -> TargetingGrid
-mergeToTargetingGrid shipGrid targetingGrid = undefined -- elementwise (\x y -> (x, y)) shipGrid targetingGrid
+-- | Perform an attack and generate a new state of the game
+attack :: Coordinate -> State -> Either AttackError State
+attack (i, j) state
+  | not inBound = Left OutOfBound
+  | otherwise =
+    if isHit
+      then (Right $ updateTarget T.Hit)
+      else (Right $ updateTarget T.Miss)
+  where
+    tGrid = targetingGrid state
+    sGrid = shipGrid state
+    cond = condition state
+    isHit =
+      case getElem i j sGrid of
+        Just _ -> True -- Just expresses a ship is in the cell
+        _ -> False
+    updateTarget :: TargetingCell -> State
+    updateTarget c = State (setElem c i j tGrid) sGrid cond
 
--- | TODO implement attack with a number of filter, fold, elementwise operations on two or more matrix
-attack :: Coordinate -> ShipGrid -> TargetingGrid -> State
-attack = undefined
+-- | Eval a recorded attack
+evalAttack :: Coordinate -> State -> Either AttackError State
+evalAttack (i, j) state
+  | not inBound = Left OutOfBound
+  | isWon sGrid tGrid = Right $ State tGrid sGrid Win
+  | isSunk (i, j) sGrid tGrid = Right $ State tGrid sGrid Sunk
+  | isTaken (i, j) tGrid = Right $ State tGrid sGrid AlreadyTaken
+  | isHit = Right $ State tGrid sGrid Hit
+  | otherwise = Right $ State tGrid sGrid Miss
+  where
+    isHit = getElem i j tGrid == T.Hit
+    tGrid = targetingGrid state
+    sGrid = shipGrid state
+
+-- | Run the game by one move
+run :: Coordinate -> State -> Either AttackError State
+run c s = undefined
