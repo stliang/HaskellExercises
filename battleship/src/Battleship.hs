@@ -107,7 +107,7 @@ shipPositions ship grid = [(i, j) | i <- [1 .. r], j <- [1 .. c], (getElem i j g
 
 -- | A list of valid ship types
 listOfShipType :: [ShipType]
-listOfShipType = enumFrom  (toEnum 0 :: ShipType)
+listOfShipType = enumFrom (toEnum 0 :: ShipType)
 
 -- | All positions of all ship types
 allShipPositions :: ShipGrid -> [Coordinate]
@@ -195,8 +195,8 @@ isOneShipAllHit ship shipGrid targetingGrid =
     coords = oneShipPositions ship shipGrid
 
 -- | Get ship grid cell type
-getShipType :: Coordinate -> ShipGrid -> Maybe ShipType
-getShipType (i, j) grid = getElem i j grid
+getShipGridCell :: Coordinate -> ShipGrid -> Maybe ShipType
+getShipGridCell (i, j) grid = getElem i j grid
 
 -- | Findout if all ships are Sunk and the game is won
 -- TODO search for a single ship position that is unchecked
