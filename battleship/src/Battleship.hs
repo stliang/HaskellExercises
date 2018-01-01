@@ -199,10 +199,13 @@ getShipGridCell :: Coordinate -> ShipGrid -> Maybe ShipType
 getShipGridCell (i, j) grid = getElem i j grid
 
 -- | Findout if all ships are Sunk and the game is won
--- TODO search for a single ship position that is unchecked
 won :: ShipGrid -> TargetingGrid -> Bool
-won shipGrid targetingGrid = undefined -- all (\x -> isOneShipAllHit x shipGrid targetingGrid) listOfShipType
+won shipGrid targetingGrid = all (\(i, j) -> (targetingCell i j) == T.Hit) ships -- all func should short circuit
+  where
+    ships = allShipPositions shipGrid
+    targetingCell i j = getElem i j targetingGrid
 
+-- all (\x -> isOneShipAllHit x shipGrid targetingGrid) listOfShipType
 -- elementwise :: (a -> b -> c) -> Matrix a -> Matrix b -> Matrix c
 mergeToTargetingGrid :: ShipGrid -> TargetingGrid -> TargetingGrid
 mergeToTargetingGrid shipGrid targetingGrid = undefined -- elementwise (\x y -> (x, y)) shipGrid targetingGrid
