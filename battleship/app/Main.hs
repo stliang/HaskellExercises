@@ -5,7 +5,7 @@ import Types
 
 main :: IO ()
 main = do
-  let scene = Scene (emptyShipGrid 10 10) []
+  let scene = Scene (mkShipGrid) []
       args =
         [ ((2, 2), TailRight, Carrier)
         , ((2, 8), TailDown, Destroyer)
