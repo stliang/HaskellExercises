@@ -15,7 +15,7 @@ Readability
 Wholesomeness (use fold)
 
 # Test result
-
+```
 Battleship
   Battleship game
     length of a ship type produces a list of ShipCoordinates of the same length
@@ -54,3 +54,4 @@ Finished in 0.0053 seconds
 31 examples, 0 failures
              
 battleship-0.1.0.0: Test suite battleship-test passed
+```
