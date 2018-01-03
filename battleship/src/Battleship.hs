@@ -1,8 +1,6 @@
 {-|
 Description : Battleship game - https://en.wikipedia.org/wiki/Battleship_(game)
-
-This version of Battleship can only have one ship per ShipType be placed
-on ShipGrid.
+This version of Battleship can only have one ship per ShipType be placed on ShipGrid.
 -}
 module Battleship where
 
