@@ -29,7 +29,6 @@ library:
   - Battleship
   - Types
   - TargetingGridTypes
-  - Lib
 
 executables:
   battleship-exe:
