@@ -28,11 +28,6 @@ catMaybes (x:xs) = maybeToList x ++ (catMaybes xs)
 flipMaybe :: [Maybe a] -> Maybe [a]
 flipMaybe [] = Nothing
 flipMaybe xs =
-  if (all (\x -> notNothing x) xs)
-    then Just $ catMaybes xs
-    else Nothing
-  where
-    notNothing x =
-      case x of
-        Just _ -> True
-        _ -> False
+  if (Nothing `elem` xs)
+    then Nothing
+    else Just $ catMaybes xs
