@@ -31,7 +31,7 @@ allWords = do
 
 randomWord :: WordList -> IO String
 randomWord wl = do
-  randomIndex <- randomRIO (0, 20)
+  randomIndex <- randomRIO (0, (length wl - 1))
   return $ wl !! randomIndex
 
 randomWord' :: IO String
@@ -49,7 +49,7 @@ instance Show Puzzle where
 freshPuzzle
   :: String -- ^ Word in play
   -> Puzzle -- ^ New puzzle
-freshPuzzle word = Puzzle word (fmap (const (Just '*')) word) []
+freshPuzzle word = Puzzle word (fmap (const (Nothing)) word) []
 
 charInWord :: Puzzle -> Char -> Bool
 charInWord (Puzzle word _ _) c = c `elem` word
