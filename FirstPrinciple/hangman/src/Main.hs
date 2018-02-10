@@ -7,18 +7,20 @@ import Data.Maybe (isJust)
 import System.Exit (exitSuccess)
 import System.Random (randomRIO)
 
-type WordList = [String]
+newtype WordList =
+  WordList [String]
+  deriving (Eq, Show)
 
 minWordLength :: Int
 minWordLength = 3
 
 maxWordLength :: Int
-maxWordLength = 6
+maxWordLength = 9
 
 gameWords :: IO WordList
 gameWords = do
-  aw <- allWords
-  return (filter gameLength aw)
+  (WordList aw) <- allWords
+  return $ WordList (filter gameLength aw)
   where
     gameLength w =
       let l = length (w :: String)
@@ -27,10 +29,10 @@ gameWords = do
 allWords :: IO WordList
 allWords = do
   dict <- readFile "data/dict.txt"
-  return (lines dict)
+  return $ WordList (lines dict)
 
 randomWord :: WordList -> IO String
-randomWord wl = do
+randomWord (WordList wl) = do
   randomIndex <- randomRIO (0, (length wl - 1))
   return $ wl !! randomIndex
 
@@ -92,7 +94,7 @@ handleGuess puzzle guess = do
 
 gameOver :: Puzzle -> IO ()
 gameOver (Puzzle wordToGuess _ guessed) =
-  if (length guessed) > 7
+  if (length guessed) > 3 + maxWordLength
     then do
       putStrLn "You loss!"
       putStrLn $ "The word was: " ++ wordToGuess
@@ -110,8 +112,8 @@ gameWin (Puzzle _ filledInSoFar _) =
 runGame :: Puzzle -> IO ()
 runGame puzzle =
   forever $ do
-    gameOver puzzle
     gameWin puzzle
+    gameOver puzzle
     putStrLn $ "Current puzzle is: " ++ show puzzle
     putStr "Guess a letter: "
     guess <- getLine
