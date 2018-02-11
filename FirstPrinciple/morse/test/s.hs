@@ -1,7 +1,3 @@
-module Main where
-
-import qualified Data.Map as M
-import Morse
 import Test.QuickCheck
 
 data Trivial =
@@ -67,11 +63,10 @@ sumGenEqual = do
 
 sumGenCharInt :: Gen (Sum Char Int)
 sumGenCharInt = sumGenEqual
+    --Arbitrary (Maybe a) where
 
-instance Arbitrary a =>
-         Arbitrary (Maybe a) where
-  arbitrary = frequency [(1, return Nothing), (3, liftM Just arbitrary)]
-
+--instance Arbitrary a =>
+--  arbitrary = frequency [(1, return Nothing), (3, liftM Just arbitrary)]
 sumGenFirstPls
   :: (Arbitrary a, Arbitrary b)
   => Gen (Sum a b)
@@ -82,21 +77,3 @@ sumGenFirstPls = do
 
 sumGenCharIntFirst :: Gen (Sum Char Int)
 sumGenCharIntFirst = sumGenFirstPls
-
-allowedChars :: [Char]
-allowedChars = M.keys letterToMorse
-
-allowedMorse :: [Morse]
-allowedMorse = M.elems letterToMorse
-
-charGen :: Gen Char
-charGen = elements allowedChars
-
-morseGen :: Gen Morse
-morseGen = elements allowedMorse
-
-prop_thereAndBackAgain :: Property
-prop_thereAndBackAgain = forAll charGen (\c -> ((charToMorse c) >>= morseToChar) == Just c)
-
-main :: IO ()
-main = quickCheck prop_thereAndBackAgain
