@@ -1,4 +1,4 @@
-module Main where
+module Spec where
 
 import qualified Data.Map as M
 import Morse
@@ -68,9 +68,9 @@ sumGenEqual = do
 sumGenCharInt :: Gen (Sum Char Int)
 sumGenCharInt = sumGenEqual
 
-instance Arbitrary a =>
-         Arbitrary (Maybe a) where
-  arbitrary = frequency [(1, return Nothing), (3, liftM Just arbitrary)]
+--instance Arbitrary a =>
+--         Arbitrary (Maybe a) where
+--  arbitrary = frequency [(1, return Nothing), (3, liftM Just arbitrary)]
 
 sumGenFirstPls
   :: (Arbitrary a, Arbitrary b)
