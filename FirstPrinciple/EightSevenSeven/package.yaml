@@ -47,3 +47,4 @@ tests:
     dependencies:
     - EightSevenSeven
     - hspec
+    - QuickCheck
